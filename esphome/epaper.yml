@@ -1,0 +1,538 @@
+esphome:
+  name: "epaper"
+  friendly_name: epaper
+  on_boot:
+    priority: 200.0
+    then:
+      - component.update: eink_display
+      - wait_until:
+          condition:
+            lambda: 'return id(data_updated) == true;'
+      - delay: 5s
+      - logger.log: "Initial sensor data received: Refreshing display..."
+      - lambda: "id(initial_data_received) = true;"
+      - script.execute: update_screen
+      - delay: 10s
+      - logger.log: "Checking sleep"
+      - lambda: |-
+          if (id(defeat).state) {
+            ESP_LOGD("main", "Prevent sleep");
+            id(deep_sleep_1).prevent_deep_sleep();
+          } else {
+            ESP_LOGD("main", "Allow sleep");
+          }
+          if(id(remote_defeat).state) {
+            ESP_LOGD("main", "Remote prevent sleep");
+            id(deep_sleep_1).prevent_deep_sleep();
+          } else {
+            ESP_LOGD("main", "Remote allow sleep");
+          }
+      - logger.log: "Sleep checked"
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+api:
+  encryption:
+    key: "MYPW"
+
+ota:
+  password: "ANOTHERPW"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+button:
+  - platform: shutdown
+    name: "epaper - Shutdown"
+  - platform: restart
+    name: "epaper - Restart"
+  - platform: template
+    name: "epaper - Refresh Screen"
+    entity_category: config
+    on_press:
+      - script.execute: update_screen
+
+deep_sleep:
+  run_duration: 60s
+  sleep_duration: 45min
+  wakeup_pin:
+    number: 4
+    inverted: True
+    mode: INPUT_PULLUP
+  id: deep_sleep_1
+
+captive_portal:
+
+web_server:
+
+globals:
+  - id: data_updated
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: initial_data_received
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: recorded_display_refresh
+    type: int
+    restore_value: yes
+    initial_value: '0'
+
+script:
+  - id: update_screen
+    then:
+      - lambda: 'id(data_updated) = false;'
+      - component.update: eink_display
+      - lambda: 'id(recorded_display_refresh) += 1;'
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+    on_time:
+      - seconds: 0
+        minutes: 2,32
+        then:
+          - script.execute: update_screen
+
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+
+font:
+  - file: "fonts/GoogleSans-Medium.ttf"
+    id: xtra_large_font
+    size: 80
+    glyphs:
+      [ '-', '.','°', '0','1', '2', '3', '4', '5', '6', '7', '8', '9']
+  - file: "fonts/GoogleSans-Medium.ttf"
+    id: large_font
+    size: 56
+    glyphs:
+      ['&', '@', '!', ',', '.', '"', '%', '(', ')', '+', '-', '_', ':', '°', '0',
+       '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+       'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+       'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
+       'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+       'u', 'v', 'w', 'x', 'y', 'z','å', 'ä', 'ö', '/', 'ü', '€']
+  - file: "fonts/GoogleSans-Bold.ttf"
+    id: medium_fontb
+    size: 36
+    glyphs:
+      ['&', '@', '!', ',', '.', '"', '%', '(', ')', '+', '-', '_', ':', '°', '0',
+       '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+       'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+       'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
+       'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+       'u', 'v', 'w', 'x', 'y', 'z', 'å', 'ä', 'ö', '/', 'ü', '€']
+  - file: "fonts/GoogleSans-Medium.ttf"
+    id: medium_fontm
+    size: 40
+    glyphs:
+      ['&', '@', '!', ',', '.', '"', '%', '(', ')', '+', '-', '_', ':', '°', '0',
+       '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+       'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+       'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
+       'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+       'u', 'v', 'w', 'x', 'y', 'z', 'å', 'ä', 'ö', '/', 'ü', '€']
+  - file: "fonts/GoogleSans-Medium.ttf"
+    id: small_font
+    size: 26
+    glyphs:
+      ['&', '@', '!', ',', '.', '"', '%', '(', ')', '+', '-', '_', ':', '°', '0',
+       '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+       'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+       'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
+       'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+       'u', 'v', 'w', 'x', 'y', 'z', 'å', 'ä', 'ö', '/', 'ü', '€']
+  - file: "fonts/GoogleSans-Medium.ttf"
+    id: xtra_small_font
+    size: 18
+    glyphs:
+      ['&', '@', '!', ',', '.', '"', '%', '(', ')', '+', '-', '_', ':', '°', '0',
+       '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+       'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+       'T', 'U', 'V', 'W', 'X', 'Y', 'Z', ' ', 'a', 'b', 'c', 'd', 'e', 'f',
+       'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't',
+       'u', 'v', 'w', 'x', 'y', 'z', 'å', 'ä', 'ö', '/', 'ü', '€']
+
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_icons_medium
+    size: 36
+    glyphs:
+      - "\U000F10C2" # Temperature High
+      - "\U000F10C3" # Temperature Low
+      - "\U000F050F" # mdi-thermometer
+      - "\U000F029A" # mdi-gauge
+      - "\U000F058E" # mdi-water-percent
+      - "\U000F07E4" # mdi-molecule-co2
+      - "\U000F059D" # mdi-weather-windy
+      - "\U000F01B4" # Tonne-Normal (Delete)
+      - "\U000F10A5" # Tonne-Anstehend (Delete)
+
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: font_icons_large
+    size: 80
+    glyphs:
+      - "\U000F0599" # mdi-weather-sunny (clear)
+      - "\U000F0595" # mdi-weather-partly-cloudy (partlycloudy)
+      - "\U000F0590" # mdi-weather-cloudy (cloudy)
+      - "\U000F0591" # mdi-weather-fog (partlycloudy-fog)
+      - "\U000F0F33" # mdi-weather-partly-rainy (partlycloudy-light-rain)
+      - "\U000F0F32" # mdi-weather-partly-lightning (partlycloudy-rain)
+      - "\U000F0597" # mdi-weather-rainy (light-rain)
+      - "\U000F0596" # mdi-weather-pouring (rainy)
+      - "\U000F067F" # mdi-weather-snowy-rainy (snowy-rainy)
+      - "\U000F0F35" # mdi-weather-partly-snowy-rainy (partlycloudy-light-snow)
+      - "\U000F0F34" # mdi-weather-partly-snowy (partlycloudy-snow)
+      - "\U000F0598" # mdi-weather-snowy (light-snow)
+      - "\U000F0F36" # mdi-weather-snowy-heavy (snowy)
+      - "\U000F067E" # mdi-weather-lightning-rainy (partlycloudy-lightning)
+      - "\U000F0593" # mdi-weather-lightning (lightning)
+      - "\U000F01B4" # Tonne-Normal (Delete)
+      - "\U000F10A5" # Tonne-Anstehend (Delete)
+
+sensor:
+
+  # OpenWeatherMap
+  - platform: homeassistant
+    entity_id: sensor.openweathermap_temperature
+    id: outside_temperature
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+        
+  - platform: homeassistant
+    entity_id: sensor.openweathermap_humidity
+    id: outside_humidity
+    unit_of_measurement: "%"
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+        
+  - platform: homeassistant
+    entity_id: sensor.openweathermap_pressure
+    id: outside_pressure
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+        
+  - platform: homeassistant
+    id: wind_speed
+    entity_id: sensor.openweathermap_wind_speed
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+  - platform: homeassistant
+    id: outside_max
+    entity_id: sensor.weather_forecast_high
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'        
+
+  - platform: homeassistant
+    id: outside_min
+    entity_id: sensor.weather_forecast_low
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'   
+
+    # Haus
+  - platform: homeassistant
+    id: temp_wohnzimmer
+    entity_id: sensor.wohnzimmer_temperature
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+  - platform: homeassistant
+    id: temp_kinderzimmer
+    entity_id: sensor.kinderzimmer_temperature
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+  - platform: homeassistant
+    id: temp_arbeitszimmer
+    entity_id: sensor.arbeitszimmer_temperature
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+    # Strom
+  - platform: homeassistant
+    id: strom_aktuell
+    entity_id: sensor.electricity_price_street_number
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+  - platform: homeassistant
+    id: strom_verbrauch
+    entity_id: sensor.accumulated_consumption_street_number
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+    #Benzin
+  - platform: homeassistant
+    id: benzin_hem
+    entity_id: sensor.hem_street_number_super_e10
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+  - platform: homeassistant
+    id: benzin_star
+    entity_id: sensor.star_street_number_super_e10
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+  - platform: homeassistant
+    id: benzin_freie
+    entity_id: sensor.tankstelle_street_number_super_e10
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+
+binary_sensor:
+  - platform: homeassistant
+    name: "Remote Defeat Sleep"
+    internal: True
+    id: "remote_defeat"
+    entity_id: input_boolean.defeat_sleep
+    on_press:
+      then:
+        - logger.log: "remote press defeat"
+        - deep_sleep.prevent: deep_sleep_1
+    on_state:
+      then:
+        - delay: 4s
+        - logger.log: "Remote state state"
+
+  - platform: gpio
+    name: "Defeat"
+    id: "defeat"
+    internal: True
+    pin:
+      number: 4
+      mode: INPUT_PULLUP
+      inverted: True
+    on_press:
+      then:
+        - logger.log: "press defeat"
+        - deep_sleep.prevent: deep_sleep_1
+
+text_sensor:
+  # Wetter
+  - platform: homeassistant
+    id: br_condition
+    entity_id: sensor.openweathermap_condition
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+    # Muell
+
+  - platform: homeassistant
+    id: tonne_blau
+    entity_id: sensor.blaue_tonne
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+  - platform: homeassistant
+    id: tonne_gelb
+    entity_id: sensor.gelbe_tonne
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+  - platform: homeassistant
+    id: tonne_schwarz
+    entity_id: sensor.schwarze_tonne
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+  - platform: homeassistant
+    id: tonne_braun
+    entity_id: sensor.braune_tonne
+    internal: true
+    on_value:
+      then:
+        - lambda: 'id(data_updated) = true;'
+
+# Now render everything on the ePaper screen.    
+display:
+  - platform: waveshare_epaper
+    id: eink_display
+    cs_pin: GPIO5
+    dc_pin: GPIO17
+    busy_pin: GPIO4
+    reset_pin: GPIO16
+    model: 7.50inV2
+    update_interval: never
+    reset_duration: 2ms
+    rotation: 90°
+    lambda: |-
+      #define xres 480 
+      #define yres 800
+      #define x_pad 20 // border padding
+      #define y_pad 60 // border padding      
+      #define val_pad 70 // padding before value
+      #define icon_y_pad 8 //padding after icons      
+      #define y_header_tag 5 // Header - Gruss
+      #define y_header_wetter 80 // Header - Wetter
+      #define y_header_muell 240 // Header - Muell
+      #define y_header_haus 380 // Header - Haus
+      #define y_header_strom 500 // Header - Strom
+      #define y_header_benzin 620 // Header - Benzin
+
+      if(isnan(id(outside_temperature).state))
+        {
+           it.printf(20, 100, id(small_font), TextAlign::LEFT, "Verbinde zu Home-Assistant...");
+        }
+      else
+        {
+          //Guten Morgen/Tag/Abend
+          if((id(homeassistant_time).now().hour >=5) && (id(homeassistant_time).now().hour <=10)) {it.printf(xres/2, y_header_tag, id(medium_fontb), TextAlign::TOP_CENTER, "Guten Morgen!");}
+          else if((id(homeassistant_time).now().hour >=11) && (id(homeassistant_time).now().hour <=17)) {it.printf(xres/2, y_header_tag, id(medium_fontb), TextAlign::TOP_CENTER, "Guten Tag!");}
+          else if((id(homeassistant_time).now().hour >=18) && (id(homeassistant_time).now().hour <=20)) {it.printf(xres/2, y_header_tag, id(medium_fontb), TextAlign::TOP_CENTER, "Guten Abend!");}
+          else if((id(homeassistant_time).now().hour <=4) || (id(homeassistant_time).now().hour >=21)) {it.printf(xres/2, y_header_tag, id(medium_fontb), TextAlign::TOP_CENTER, "Gute Nacht!");}
+
+          //Wetter
+          it.printf(x_pad, y_header_wetter, id(medium_fontb), TextAlign::BASELINE_LEFT, "Wetter");
+          it.line(x_pad+130, y_header_wetter-10, xres-x_pad, y_header_wetter-10);
+
+          //Temp Gross und Icon
+          it.printf(xres-x_pad-80, y_header_wetter-15, id(xtra_large_font), TextAlign::TOP_RIGHT, "%2.1f°", id(outside_temperature).state);
+          if (id(br_condition).state == "clear") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0599");}
+          if (id(br_condition).state == "partlycloudy") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0595");}
+          if (id(br_condition).state == "cloudy") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0590");}
+          if (id(br_condition).state == "partlycloudy-fog") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0591");}
+          if (id(br_condition).state == "partlycloudy-light-rain") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0F33");}
+          if (id(br_condition).state == "partlycloudy-rain") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0F32");}
+          if (id(br_condition).state == "light-rain") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0597");}
+          if (id(br_condition).state == "rainy") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0596");}         
+          if (id(br_condition).state == "snowy-rainy") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F067F");}
+          if (id(br_condition).state == "partlycloudy-light-snow") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0F35");}
+          if (id(br_condition).state == "partlycloudy-snow") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0F34");}
+          if (id(br_condition).state == "light-snow") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0598");}   
+          if (id(br_condition).state == "snowy") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0F36");} 
+          if (id(br_condition).state == "partlycloudy-lightning") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F067E");}
+          if (id(br_condition).state == "lightning") {
+          it.printf(xres-x_pad, y_header_wetter-5, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F0593");}
+
+          //Luftfeuchte etc
+          it.printf(x_pad, y_header_wetter+50, id(font_icons_medium), TextAlign::BASELINE_LEFT, "\U000F058E");
+          it.printf(x_pad+40, y_header_wetter+50, id(medium_fontm), TextAlign::BASELINE_LEFT, "%2.0f%%", id(outside_humidity).state);
+
+          it.printf(x_pad, y_header_wetter+100, id(font_icons_medium), TextAlign::BASELINE_LEFT, "\U000F059D");
+          it.printf(x_pad+40, y_header_wetter+100, id(medium_fontm), TextAlign::BASELINE_LEFT, "%2.1f km/h", id(wind_speed).state);    
+
+          it.printf(x_pad+210, y_header_wetter+100, id(xtra_small_font), TextAlign::BASELINE_LEFT, "Min: %2.2f°C", id(outside_min).state);
+          it.printf(x_pad+330, y_header_wetter+100, id(xtra_small_font), TextAlign::BASELINE_LEFT, "Max: %2.2f°C", id(outside_max).state);
+
+          //Muell
+          it.printf(x_pad, y_header_muell, id(medium_fontb), TextAlign::BASELINE_LEFT, "Müll");
+          it.line(x_pad+75, y_header_muell-10, xres-x_pad, y_header_muell-10);
+
+          it.printf(x_pad, y_header_muell+10, id(xtra_small_font), TextAlign::TOP_LEFT, "Blaue Tonne:");
+          it.printf(x_pad+160, y_header_muell+10, id(xtra_small_font), TextAlign::TOP_LEFT, id(tonne_blau).state.c_str());
+
+          it.printf(x_pad, y_header_muell+30, id(xtra_small_font), TextAlign::TOP_LEFT, "Gelbe Tonne:");
+          it.printf(x_pad+160, y_header_muell+30, id(xtra_small_font), TextAlign::TOP_LEFT, id(tonne_gelb).state.c_str());
+
+          it.printf(x_pad, y_header_muell+50, id(xtra_small_font), TextAlign::TOP_LEFT, "Schwarze Tonne:");
+          it.printf(x_pad+160, y_header_muell+50, id(xtra_small_font), TextAlign::TOP_LEFT, id(tonne_schwarz).state.c_str());
+
+          it.printf(x_pad, y_header_muell+70, id(xtra_small_font), TextAlign::TOP_LEFT, "Braune Tonne:");
+          it.printf(x_pad+160, y_header_muell+70, id(xtra_small_font), TextAlign::TOP_LEFT, id(tonne_braun).state.c_str());
+
+          if(id(tonne_blau).state.c_str()=="Heute" || id(tonne_blau).state.c_str()=="Morgen" || id(tonne_gelb).state.c_str()=="Heute" || id(tonne_gelb).state.c_str()=="Morgen" || id(tonne_schwarz).state.c_str()=="Heute" || id(tonne_schwarz).state.c_str()=="Morgen" || id(tonne_braun).state.c_str()=="Heute" || id(tonne_braun).state.c_str()=="Morgen") {
+            it.printf(xres-50, y_header_muell+15, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F10A5");
+          } else {
+            it.printf(xres-50, y_header_muell+15, id(font_icons_large), TextAlign::TOP_RIGHT, "\U000F01B4");
+          }
+
+          //Haus
+          it.printf(x_pad, y_header_haus, id(medium_fontb), TextAlign::BASELINE_LEFT, "Haus");
+          it.line(x_pad+95, y_header_haus-10, xres-x_pad, y_header_haus-10);
+
+          it.printf(x_pad+60, y_header_haus+10, id(xtra_small_font), TextAlign::TOP_CENTER, "Wohnzimmer");
+          it.printf(x_pad+60, y_header_haus+30, id(medium_fontm), TextAlign::TOP_CENTER, "%2.1f°C", id(temp_wohnzimmer).state);
+
+          it.printf(xres/2, y_header_haus+10, id(xtra_small_font), TextAlign::TOP_CENTER, "Kinderzimmer");
+          it.printf(xres/2, y_header_haus+30, id(medium_fontm), TextAlign::TOP_CENTER, "%2.1f°C", id(temp_kinderzimmer).state);
+
+          it.printf(x_pad+370, y_header_haus+10, id(xtra_small_font), TextAlign::TOP_CENTER, "Arbeitszimmer");
+          it.printf(x_pad+370, y_header_haus+30, id(medium_fontm), TextAlign::TOP_CENTER, "%2.1f°C", id(temp_arbeitszimmer).state);
+
+          //Strom
+          it.printf(x_pad, y_header_strom, id(medium_fontb), TextAlign::BASELINE_LEFT, "Strom");
+          it.line(x_pad+110, y_header_strom-10, xres-x_pad, y_header_strom-10);
+
+          it.printf(x_pad+60, y_header_strom+10, id(xtra_small_font), TextAlign::TOP_CENTER, "Strompreis");
+          it.printf(x_pad+60, y_header_strom+30, id(medium_fontm), TextAlign::TOP_CENTER, "%2.2f€", id(strom_aktuell).state);
+
+          it.printf(xres/2, y_header_strom+10, id(xtra_small_font), TextAlign::TOP_CENTER, "Verbrauch");
+          it.printf(xres/2, y_header_strom+30, id(medium_fontm), TextAlign::TOP_CENTER, "%2.2fkWh", id(strom_verbrauch).state);
+
+          //Benzin
+          it.printf(x_pad, y_header_benzin, id(medium_fontb), TextAlign::BASELINE_LEFT, "Sprit");
+          it.line(x_pad+90, y_header_benzin-10, xres-x_pad, y_header_benzin-10);
+
+          it.printf(x_pad+60, y_header_benzin+10, id(xtra_small_font), TextAlign::TOP_CENTER, "STAR");
+          it.printf(x_pad+60, y_header_benzin+30, id(medium_fontm), TextAlign::TOP_CENTER, "%2.3f€", id(benzin_star).state);
+
+          it.printf(xres/2, y_header_benzin+10, id(xtra_small_font), TextAlign::TOP_CENTER, "HEM");
+          it.printf(xres/2, y_header_benzin+30, id(medium_fontm), TextAlign::TOP_CENTER, "%2.3f€", id(benzin_hem).state);
+
+          it.printf(x_pad+370, y_header_benzin+10, id(xtra_small_font), TextAlign::TOP_CENTER, "Silberberg");
+          it.printf(x_pad+370, y_header_benzin+30, id(medium_fontm), TextAlign::TOP_CENTER, "%2.3f€", id(benzin_freie).state);
+
+          //Last updated
+          it.line(x_pad, yres-30, xres-x_pad, yres-30);
+          it.strftime((xres/2), yres-5, id(xtra_small_font), TextAlign::BOTTOM_CENTER, "Zuletzt aktualisiert: %d.%m.%Y  %H:%M", id(homeassistant_time).now());
+        }
